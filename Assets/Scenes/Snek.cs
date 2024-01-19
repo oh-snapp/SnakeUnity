@@ -103,9 +103,13 @@ public class Snek : MonoBehaviour
         }
         else
         {
+            // when we move, add a new head to the end of the list
+            // and remove the tail
             blockCoords.Add(newCoord);
             blockCoords.RemoveAt(0);
 
+            // instead of deleting and readding GameObjects (slow)
+            // treat the tail block as the new head
             var backBlock = blocks[0];
             blocks.RemoveAt(0);
             backBlock.transform.position = (Vector2)newCoord;
@@ -118,7 +122,7 @@ public class Snek : MonoBehaviour
         return
             System.Math.Abs(coord.x) <= boardProperties.HalfExtent.x
             && System.Math.Abs(coord.y) <= boardProperties.HalfExtent.y
-            && !blockCoords.Contains(coord);
+            && !blockCoords.Contains(coord) /* if running into self */;
     }
 
     void RandomizeApple()
