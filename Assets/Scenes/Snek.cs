@@ -10,6 +10,11 @@ public class Snek : MonoBehaviour
     [SerializeField] GameObject applePrefab;
 
     [SerializeField] float moveInterval;
+
+    [SerializeField] float speedIncrement = 0.2f;
+    [SerializeField] int nApplesPerSpeedIncrement = 3;
+    [SerializeField] float sprintSpeedMult = 1.5f;
+
     [SerializeField] Vector2Int startBlockPosition;
     [SerializeField] Vector2Int startApplePosition;
 
@@ -28,9 +33,13 @@ public class Snek : MonoBehaviour
 
     bool gameOver = false;
 
+    int nApplesSinceLastSpeedIncrement = 0;
+    float speed;
+
     void Awake()
     {
         AddBlock(startBlockPosition);
+        speed = boardProperties.Speed;
     }
 
     void Start()
@@ -71,9 +80,14 @@ public class Snek : MonoBehaviour
         {
             if(Time.time > nextMoveTime)
             {
+                float speedMult = 1.0f;
+                if (Input.GetButton("Sprint"))
+                {
+                    speedMult = sprintSpeedMult;
+                }
                 Move(lastInputDirection);
                 curMoveDirection = lastInputDirection;
-                nextMoveTime += moveInterval / boardProperties.Speed;
+                nextMoveTime += moveInterval / (speed * speedMult);
             }
         }
     }
@@ -100,6 +114,13 @@ public class Snek : MonoBehaviour
         {
             AddBlock(newCoord);
             RandomizeApple();
+
+            nApplesSinceLastSpeedIncrement += 1;
+            if(nApplesSinceLastSpeedIncrement >= nApplesPerSpeedIncrement)
+            {
+                speed += speedIncrement;
+                nApplesPerSpeedIncrement = 0;
+            }
         }
         else
         {
