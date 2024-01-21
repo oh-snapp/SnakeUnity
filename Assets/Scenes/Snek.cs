@@ -40,6 +40,7 @@ public class Snek : MonoBehaviour
     [SerializeField] GameObject applePrefab;
 
     [SerializeField] float moveInterval;
+    [SerializeField] float sprintSpeedMult = 1.5f;
     [SerializeField] Vector2Int startBlockPosition;
     [SerializeField] Vector2Int startApplePosition;
 
@@ -151,8 +152,17 @@ public class Snek : MonoBehaviour
             blockCoords.Add(newHeadCoord);
         }
 
+        float speedMult = 1.0f;
+
+        // multiply speed by sprintSpeedMult
+        // while Sprint is held down
+        if (Input.GetButton("Sprint"))
+        {
+            speedMult *= sprintSpeedMult;
+        }
+
         curMoveDirection = direction;
-        nextMoveTime += moveInterval / boardProperties.Speed;
+        nextMoveTime += moveInterval / (boardProperties.Speed * speedMult);
     }
 
     bool CanEnterCoordinate(Vector2Int coord)
