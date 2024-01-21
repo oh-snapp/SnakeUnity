@@ -40,6 +40,8 @@ public class Snek : MonoBehaviour
     [SerializeField] GameObject applePrefab;
 
     [SerializeField] float moveInterval;
+    [SerializeField] float speedIncrement = 0.2f;
+    [SerializeField] int nApplesPerSpeedIncrement = 3;
     [SerializeField] Vector2Int startBlockPosition;
     [SerializeField] Vector2Int startApplePosition;
 
@@ -59,6 +61,9 @@ public class Snek : MonoBehaviour
     float nextMoveTime = 0;
 
     bool gameOver = false;
+
+    float netSpeedIncrement = 0.0f;
+    int nApplesSinceSpeedIncrement = 0;
 
     void Awake()
     {
@@ -152,7 +157,7 @@ public class Snek : MonoBehaviour
         }
 
         curMoveDirection = direction;
-        nextMoveTime += moveInterval / boardProperties.Speed;
+        nextMoveTime += moveInterval / (boardProperties.Speed + netSpeedIncrement);
     }
 
     bool CanEnterCoordinate(Vector2Int coord)
@@ -185,6 +190,18 @@ public class Snek : MonoBehaviour
 
         appleCoord = newCoord;
         apple.transform.position = (Vector2)newCoord;
+
+        ++nApplesSinceSpeedIncrement;
+        if(nApplesSinceSpeedIncrement >= nApplesPerSpeedIncrement)
+        {
+            IncrementSpeed();
+        }
+    }
+
+    void IncrementSpeed()
+    {
+        netSpeedIncrement += speedIncrement;
+        nApplesSinceSpeedIncrement = 0;
     }
 
     Vector2Int GetBlockCoord(GameObject block)
