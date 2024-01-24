@@ -2,36 +2,6 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// The logic behind <c>Snek</c>'s movement (<c>Snek.Move</c>) is that we have
-/// a collection of blocks that represent the snake
-/// where the first represents the tail and the last
-/// represents the head.
-///
-/// When we move, we want to "shift every block forward one"
-///
-/// Eg, if this is our snake (with X being the head) and we are moving up,
-/// the desired change is:
-///
-///            X
-///  xxX ->  xxx
-/// xx       x
-///
-/// However, this is the same as the following sequence of steps:
-///
-///        remove old tail   add new head
-///                                  X
-///  xxX    ->  xxx        ->      xxx
-/// xx          x                  x
-///
-/// (It is also the same as moving the
-///
-/// The way movement works with input is that every <c>Snek.moveInterval</c> number
-/// of seconds (scaled according to speed), we check what key the player last pressed and
-/// move in that direction.
-/// This could be done using a coroutine, but in this it is done by storing
-/// <c>Snek.nextMoveTime</c> and comparing it with <c>Time.time</c> in <c>Snek.Update</c>
-/// </summary>
 public class Snek : MonoBehaviour
 {
     [SerializeField] BoardProperties boardProperties;
@@ -40,18 +10,18 @@ public class Snek : MonoBehaviour
     [SerializeField] GameObject applePrefab;
 
     [SerializeField] float moveInterval;
-    [SerializeField] float sprintSpeedMult = 1.5f;
+
     [SerializeField] float speedIncrement = 0.2f;
     [SerializeField] int nApplesPerSpeedIncrement = 3;
+    [SerializeField] float sprintSpeedMult = 1.5f;
+
     [SerializeField] Vector2Int startBlockPosition;
     [SerializeField] Vector2Int startApplePosition;
 
     public System.Action GameOverEvent;
 
-    // we used LinkedList to make it fast to remove and insert to front and back
-    LinkedList<GameObject> blocks = new();
-    // we use a hashset to check if a block exists quickly
-    HashSet<Vector2Int> blockCoords = new();
+    List<Vector2Int> blockCoords = new();
+    List<GameObject> blocks = new();
 
     Vector2Int appleCoord = new();
     GameObject apple = null;
@@ -63,12 +33,13 @@ public class Snek : MonoBehaviour
 
     bool gameOver = false;
 
-    float netSpeedIncrement = 0.0f;
-    int nApplesSinceSpeedIncrement = 0;
+    int nApplesSinceLastSpeedIncrement = 0;
+    float speed;
 
     void Awake()
     {
         AddBlock(startBlockPosition);
+        speed = boardProperties.Speed;
     }
 
     void Start()
@@ -90,11 +61,10 @@ public class Snek : MonoBehaviour
         {
             inputDirection.y = 0;
         }
-
+        
         if(
             inputDirection != Vector2Int.zero
-            && !Mathf.Approximately(Vector2.Dot(curMoveDirection, inputDirection), -1f)
-            // dont allow moving in opposite direction of movement
+            && !Mathf.Approximately(Vector2.Dot(curMoveDirection, inputDirection), -1f) // dont allow moving in opposite direction of movement
             // (instant death)
         )
         {
@@ -110,119 +80,83 @@ public class Snek : MonoBehaviour
         {
             if(Time.time > nextMoveTime)
             {
+                float speedMult = 1.0f;
+                if (Input.GetButton("Sprint"))
+                {
+                    speedMult = sprintSpeedMult;
+                }
                 Move(lastInputDirection);
+                curMoveDirection = lastInputDirection;
+                nextMoveTime += moveInterval / (speed * speedMult);
             }
         }
     }
 
     void AddBlock(Vector2Int position)
     {
+        blockCoords.Add(position);
+
         var block = Instantiate(blockPrefab, transform);
         block.transform.localPosition = (Vector2)position;
 
-        blocks.AddFirst(block);
-
-        blockCoords.Add(position);
+        blocks.Add(block);
     }
 
     void Move(Vector2Int direction)
     {
-        var newHeadCoord = HeadCoord + direction;
-
-        if (!CanEnterCoordinate(newHeadCoord))
+        var newCoord = blockCoords[^1] + direction;
+        if (!CanEnterCoordinate(newCoord))
         {
             gameOver = true;
-            // used to notify UI
             GameOverEvent?.Invoke();
         }
-        else if(appleCoord == newHeadCoord)
+        else if(appleCoord == newCoord)
         {
-            AddBlock(appleCoord);
-            EatApple();
+            AddBlock(newCoord);
+            RandomizeApple();
+
+            nApplesSinceLastSpeedIncrement += 1;
+            if(nApplesSinceLastSpeedIncrement >= nApplesPerSpeedIncrement)
+            {
+                speed += speedIncrement;
+                nApplesPerSpeedIncrement = 0;
+            }
         }
-        // regular move
         else
         {
-            var tailBlock = blocks.Last.Value;
+            // when we move, add a new head to the end of the list
+            // and remove the tail
+            blockCoords.Add(newCoord);
+            blockCoords.RemoveAt(0);
 
-            // remove tail
-            blocks.RemoveLast();
-            blockCoords.Remove(GetBlockCoord(tailBlock));
-
-            // change tail to head
-            tailBlock.transform.position = (Vector2)newHeadCoord;
-
-            // add tail into head position
-            blocks.AddFirst(tailBlock);
-            blockCoords.Add(newHeadCoord);
+            // instead of deleting and readding GameObjects (slow)
+            // treat the tail block as the new head
+            var backBlock = blocks[0];
+            blocks.RemoveAt(0);
+            backBlock.transform.position = (Vector2)newCoord;
+            blocks.Add(backBlock);
         }
-
-        float speedMult = 1.0f;
-
-        // multiply speed by sprintSpeedMult
-        // while Sprint is held down
-        if (Input.GetButton("Sprint"))
-        {
-            speedMult *= sprintSpeedMult;
-        }
-
-        curMoveDirection = direction;
-        nextMoveTime += moveInterval / (boardProperties.Speed * speedMult + netSpeedIncrement);
     }
 
     bool CanEnterCoordinate(Vector2Int coord)
     {
         return
-            // hitting horizontal wall
             System.Math.Abs(coord.x) <= boardProperties.HalfExtent.x
-            // hitting vertical wall
             && System.Math.Abs(coord.y) <= boardProperties.HalfExtent.y
-            // running into snake
-            // (could use physics, but that's overkill)
-            && !blockCoords.Contains(coord);
+            && !blockCoords.Contains(coord) /* if running into self */;
     }
 
-    void EatApple()
+    void RandomizeApple()
     {
         Vector2Int newCoord;
         do
         {
-            // pick a random coordiante
             newCoord = new Vector2Int(
                 Random.Range(-boardProperties.HalfExtent.x, boardProperties.HalfExtent.x),
                 Random.Range(-boardProperties.HalfExtent.y, boardProperties.HalfExtent.y)
             );
-            // ensure the new coordinate is not the same as the old apple coordinate
-            // and that the new coordinate in not inside the snake
         } while(newCoord == appleCoord || blockCoords.Contains(newCoord));
-        // (note that this method of picking a new coord may be naive
-        // and will get really slow as the snake gets bigger)
-
         appleCoord = newCoord;
         apple.transform.position = (Vector2)newCoord;
-
-        ++nApplesSinceSpeedIncrement;
-        if(nApplesSinceSpeedIncrement >= nApplesPerSpeedIncrement)
-        {
-            IncrementSpeed();
-        }
     }
-
-    void IncrementSpeed()
-    {
-        netSpeedIncrement += speedIncrement;
-        nApplesSinceSpeedIncrement = 0;
-    }
-
-    Vector2Int GetBlockCoord(GameObject block)
-    {
-        return Vector2Int.RoundToInt(block.transform.position);
-    }
-
-    // the => means that whenever we use <c>HeadCoord</c>
-    // use the value <c>GetBlockCoord(blocks.First.Value)</c> instead
-    // (its called an Expression body definition for a readonly property)
-    // (you can also use it for one-line member functions like <c>int Square(int x) => x * x;</c>)
-    // <see href="https://learn.microsoft.com/en-us/dotnet/csharp/programming-guide/statements-expressions-operators/expression-bodied-members#read-only-properties" />
-    Vector2Int HeadCoord => GetBlockCoord(blocks.First.Value);
 }
