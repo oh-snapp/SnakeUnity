@@ -3,31 +3,31 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// The logic behind <c>Snek</c>'s movement (<c>Snek.Move</c>) is that we have 
+/// The logic behind <c>Snek</c>'s movement (<c>Snek.Move</c>) is that we have
 /// a collection of blocks that represent the snake
 /// where the first represents the tail and the last
 /// represents the head.
-/// 
+///
 /// When we move, we want to "shift every block forward one"
-/// 
+///
 /// Eg, if this is our snake (with X being the head) and we are moving up,
 /// the desired change is:
 ///
 ///            X
 ///  xxX ->  xxx
 /// xx       x
-/// 
+///
 /// However, this is the same as the following sequence of steps:
-/// 
+///
 ///        remove old tail   add new head
 ///                                  X
 ///  xxX    ->  xxx        ->      xxx
 /// xx          x                  x
-/// 
-/// (It is also the same as moving the 
-/// 
-/// The way movement works with input is that every <c>Snek.moveInterval</c> number 
-/// of seconds (scaled according to speed), we check what key the player last pressed and 
+///
+/// (It is also the same as moving the
+///
+/// The way movement works with input is that every <c>Snek.moveInterval</c> number
+/// of seconds (scaled according to speed), we check what key the player last pressed and
 /// move in that direction.
 /// This could be done using a coroutine, but in this it is done by storing
 /// <c>Snek.nextMoveTime</c> and comparing it with <c>Time.time</c> in <c>Snek.Update</c>
@@ -41,6 +41,8 @@ public class Snek : MonoBehaviour
 
     [SerializeField] float moveInterval;
     [SerializeField] float sprintSpeedMult = 1.5f;
+    [SerializeField] float speedIncrement = 0.2f;
+    [SerializeField] int nApplesPerSpeedIncrement = 3;
     [SerializeField] Vector2Int startBlockPosition;
     [SerializeField] Vector2Int startApplePosition;
 
@@ -60,6 +62,9 @@ public class Snek : MonoBehaviour
     float nextMoveTime = 0;
 
     bool gameOver = false;
+
+    float netSpeedIncrement = 0.0f;
+    int nApplesSinceSpeedIncrement = 0;
 
     void Awake()
     {
@@ -85,10 +90,10 @@ public class Snek : MonoBehaviour
         {
             inputDirection.y = 0;
         }
-        
+
         if(
             inputDirection != Vector2Int.zero
-            && !Mathf.Approximately(Vector2.Dot(curMoveDirection, inputDirection), -1f) 
+            && !Mathf.Approximately(Vector2.Dot(curMoveDirection, inputDirection), -1f)
             // dont allow moving in opposite direction of movement
             // (instant death)
         )
@@ -139,7 +144,7 @@ public class Snek : MonoBehaviour
         else
         {
             var tailBlock = blocks.Last.Value;
-            
+
             // remove tail
             blocks.RemoveLast();
             blockCoords.Remove(GetBlockCoord(tailBlock));
@@ -162,7 +167,7 @@ public class Snek : MonoBehaviour
         }
 
         curMoveDirection = direction;
-        nextMoveTime += moveInterval / (boardProperties.Speed * speedMult);
+        nextMoveTime += moveInterval / (boardProperties.Speed * speedMult + netSpeedIncrement);
     }
 
     bool CanEnterCoordinate(Vector2Int coord)
@@ -195,6 +200,18 @@ public class Snek : MonoBehaviour
 
         appleCoord = newCoord;
         apple.transform.position = (Vector2)newCoord;
+
+        ++nApplesSinceSpeedIncrement;
+        if(nApplesSinceSpeedIncrement >= nApplesPerSpeedIncrement)
+        {
+            IncrementSpeed();
+        }
+    }
+
+    void IncrementSpeed()
+    {
+        netSpeedIncrement += speedIncrement;
+        nApplesSinceSpeedIncrement = 0;
     }
 
     Vector2Int GetBlockCoord(GameObject block)
