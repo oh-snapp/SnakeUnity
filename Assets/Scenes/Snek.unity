@@ -519,7 +519,7 @@ MonoBehaviour:
   boardProperties: {fileID: 11400000, guid: 79c3800e0efb42e46b20de9cad63b2ca, type: 2}
   blockPrefab: {fileID: 5631815265899956902, guid: ab63530c58b88ce47a67fd996d8918b4, type: 3}
   applePrefab: {fileID: 5631815265899956902, guid: 3ce643320f37ca14a9ef64548a68b698, type: 3}
-  moveInterval: 0.7
+  moveInterval: 0.6
   startBlockPosition: {x: -2, y: 0}
   startApplePosition: {x: 2, y: 0}
 --- !u!4 &787781051
